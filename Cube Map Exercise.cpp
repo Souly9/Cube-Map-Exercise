@@ -60,40 +60,37 @@ int main()
 
 	glViewport(0, 0, screenWidth, screenHeight);
 
-	glEnable(GL_DEPTH_TEST);
-
 	//Tell OpenGL we want to call our previously define resize function on resize
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
 	Shader ourShader("vert.vs", "envFrag.fs");
 	Shader cubeMapShader("cubeMapVert.vs", "cubeMapFrag.fs");
 	
-	//sample the environment map
-
+	//create/read the environment map
+	//-------------------------------------------------------------------------
 	int width, height, nrChannels;
 	stbi_set_flip_vertically_on_load(true);
 	
 	float *data = stbi_loadf("cedar_bridge_1k1.hdr",
 		&width, &height, &nrChannels, 0);
+	
 	if (!data)
 		std::cout << "Image not loaded correctly" << std::endl;
 	
-	//creating a texture out of the hdr image
 	unsigned int envMap;
 	glGenTextures(1, &envMap);
 	glBindTexture(GL_TEXTURE_2D, envMap);
 
-	
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, width, height, 0, GL_RGB, GL_FLOAT, data);
-
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
 	stbi_image_free(data);
 
+	//allocate second framebuffer for the cubemap generation
+	//-------------------------------------------------------------------------
 	unsigned int cubeMapBuffer;
 	glGenFramebuffers(1, &cubeMapBuffer);
 	glBindFramebuffer(GL_FRAMEBUFFER, cubeMapBuffer);
@@ -101,25 +98,23 @@ int main()
 	unsigned int cubeMap;
 	glGenTextures(1, &cubeMap);
 	glBindTexture(GL_TEXTURE_2D, cubeMap);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, 512, 512, 0, GL_RGB, GL_FLOAT, nullptr);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, 800, 600, 0, GL_RGB, GL_FLOAT, nullptr);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, cubeMap, 0);
-	
-	if (glCheckFramebufferStatus((GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE))
-		std::cout << "yeeeeees";
 
 	//Now that we have our own Buffer for the Cubemap rendering we can create the needed geometry
+	//-------------------------------------------------------------------------
 	float squareCoordinates[] = {
-		-1.0f,  1.0f,  
-		-1.0f, -1.0f,  
-		 1.0f, -1.0f,
-		 1.0f, 1.0f
+		1.0f,  1.0f,   
+		 1.0f, -1.0f,   
+		-1.0f, -1.0f,   
+		-1.0f,  1.0f  
 	};
 	//indices for drawing the square
 	unsigned int squareIndices[] = {
-	0, 1, 2,
-	0, 1, 3
+		0, 1, 3,  
+		1, 2, 3  
 	};
 
 	//usual buffer creation and binding
@@ -136,9 +131,12 @@ int main()
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, squareIndexBuffer);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(squareIndices), squareIndices, GL_STATIC_DRAW);
 
-	glVertexAttribPointer(0, 1, GL_FLOAT, GL_FALSE, 2 * sizeof(float), static_cast<void*>(nullptr));
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 2 * sizeof(float), static_cast<void*>(nullptr));
 	glEnableVertexAttribArray(0);
+
 	
+	//Bind our main framebuffer again to actually prepare the final scene
+	//-------------------------------------------------------------------------
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	
 	//get our relevant coordinates and begin filling up the buffers for the sphere model
@@ -146,6 +144,7 @@ int main()
 	std::vector<float> vertices;
 	createSphereCoordinates(2.0, 144, 72, indices, vertices);
 
+	
 	unsigned int buffer, VAO, EBO;
 	glGenVertexArrays(1, &VAO);
 	glGenBuffers(1, &buffer);
@@ -154,35 +153,36 @@ int main()
 	// bind the Vertex Array Object first, then bind and set vertex buffer(s), and then configure vertex attributes(s).
 	glBindVertexArray(VAO);
 
-	glBindBuffer(GL_ARRAY_BUFFER, buffer);;
+	glBindBuffer(GL_ARRAY_BUFFER, buffer);
 	glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
-
+	
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
 	
-
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), static_cast<void*>(nullptr));
 	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
 	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
 	glEnableVertexAttribArray(0);
 	glEnableVertexAttribArray(1);
 	glEnableVertexAttribArray(2);
+	
 	while (!glfwWindowShouldClose(window))
 	{
 		processInput(window);
-
+		
+		//clear screen
 		glClearColor(1.0f, 0.3f, 1.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+		//first, offscreen renderpass
 		cubeMapShader.use();
-
 		glBindFramebuffer(GL_FRAMEBUFFER, cubeMapBuffer);
 		glDisable(GL_DEPTH_TEST);
 		glBindVertexArray(squareVAO);
 		glBindTexture(GL_TEXTURE_2D, cubeMap);
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
-
-
+		
+		//Bind the main framebuffer again for second renderpass
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		glEnable(GL_DEPTH_TEST);
 		glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
@@ -194,17 +194,16 @@ int main()
 														 static_cast<float>(screenWidth) / static_cast<float>(
 															 screenHeight), 0.1f, 100.0f));
 		ourShader.setMat4("viewMatrix", glm::mat4(1.0f));
+		glUniform2fv(glGetUniformLocation(ourShader.ID, "invAtan"), 1, value_ptr(invAtan));
+		
 		glBindTexture(GL_TEXTURE_2D, cubeMap);
 		glBindVertexArray(VAO);
 		
-
 		/*glUniform3fv(glGetUniformLocation(ourShader.ID, "lightColor"), 1, value_ptr(lightColor));
 		glUniform3fv(glGetUniformLocation(ourShader.ID, "objectColor"), 1, value_ptr(glm::vec3(1.0f, 0.5f, 0.2f)));
 		glUniform3fv(glGetUniformLocation(ourShader.ID, "lightPos"), 1, value_ptr(lightPos));
 		glUniform3fv(glGetUniformLocation(ourShader.ID, "viewPos"), 1, value_ptr(glm::vec3(0, 0, 0)));*/
-		glUniform2fv(glGetUniformLocation(ourShader.ID, "invAtan"), 1, value_ptr(invAtan));
 
-		
 		glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, nullptr);
 		
 		glfwSwapBuffers(window);
@@ -212,9 +211,12 @@ int main()
 	}
 
 	glDeleteVertexArrays(1, &VAO);
+	glDeleteVertexArrays(1, &squareVAO);
 	glDeleteBuffers(1, &buffer);
 	glDeleteBuffers(1, &EBO);
-
+	glDeleteBuffers(1, &squareBuffer);
+	glDeleteBuffers(1, &squareIndexBuffer);
+	
 	glfwTerminate();
 	return 0;
 }

@@ -1,7 +1,7 @@
 ﻿  Cube Map Exercise.cpp
-d:\programme\fh\rendering\cubemap\cube map exercise\cube map exercise\cube map exercise.cpp(303): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
-d:\programme\fh\rendering\cubemap\cube map exercise\cube map exercise\cube map exercise.cpp(309): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
-d:\programme\fh\rendering\cubemap\cube map exercise\cube map exercise\cube map exercise.cpp(336): warning C4244: '=': conversion from 'float' to 'int', possible loss of data
-d:\programme\fh\rendering\cubemap\cube map exercise\cube map exercise\cube map exercise.cpp(337): warning C4244: '=': conversion from 'float' to 'int', possible loss of data
-d:\programme\fh\rendering\cubemap\cube map exercise\cube map exercise\cube map exercise.cpp(298): warning C4101: 'sinStack': unreferenced local variable
+d:\programme\fh\rendering\cubemap\cube map exercise\cube map exercise\cube map exercise.cpp(305): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+d:\programme\fh\rendering\cubemap\cube map exercise\cube map exercise\cube map exercise.cpp(311): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+d:\programme\fh\rendering\cubemap\cube map exercise\cube map exercise\cube map exercise.cpp(338): warning C4244: '=': conversion from 'float' to 'int', possible loss of data
+d:\programme\fh\rendering\cubemap\cube map exercise\cube map exercise\cube map exercise.cpp(339): warning C4244: '=': conversion from 'float' to 'int', possible loss of data
+d:\programme\fh\rendering\cubemap\cube map exercise\cube map exercise\cube map exercise.cpp(300): warning C4101: 'sinStack': unreferenced local variable
   Cube Map Exercise.vcxproj -> D:\Programme\FH\Rendering\CubeMap\Cube Map Exercise\Debug\Cube Map Exercise.exe
