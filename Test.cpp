@@ -28,7 +28,7 @@ glm::vec3 lightPos(0.0f, 0.0f, 1.0f);
 glm::vec3 lightColor(1.0f, 1.0f, 1.0f);
 
 //later used to manipulate rotation from processInput method for rendering, hence the global variable
-glm::mat4 transMatrix = translate(glm::mat4(1.0f), glm::vec3(0, 0, -2.0));
+glm::mat4 transMatrix = translate(glm::mat4(1.0f), glm::vec3(0, 0, 0.0));
 
 //helper variables to control rotation with arrow keys
 bool left = false, up = false;
@@ -38,7 +38,7 @@ float rotateX = 0, rotateY = 0;
 void processInput(GLFWwindow* window);
 
 //method to create Sphere Coordinates to draw the Sphere! Check definition for more details
-void createSphereCoordinates(float radius, float sectors, float stacks, std::vector<unsigned int> &EBO, std::vector<float>& buffer);
+void createSphereCoordinates(float radius, float sectors, float stacks, std::vector<unsigned int>& EBO, std::vector<float>& buffer);
 
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
@@ -69,14 +69,13 @@ int main()
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
 	Shader ourShader("vert.vs", "envFrag.fs");
-	Shader cubeMapShader("cubeMapVert.vs", "cubeMapFrag.frag");
 
 	//create/read the environment map
 	//-------------------------------------------------------------------------
 	int width, height, nrChannels;
 	stbi_set_flip_vertically_on_load(true);
 
-	float* data = stbi_loadf("champagne_castle_1_1k.hdr",
+	float* data = stbi_loadf("cedar_bridge_1k1.hdr",
 		&width, &height, &nrChannels, 0);
 
 	if (!data)
@@ -94,109 +93,17 @@ int main()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	stbi_image_free(data);
 
-	//allocate framebuffer for the cubemap generation
-	//-------------------------------------------------------------------------
-	unsigned int cubeMapBuffer;
-	glGenFramebuffers(1, &cubeMapBuffer);
-	glBindFramebuffer(GL_FRAMEBUFFER, cubeMapBuffer);
-
-	unsigned int bufferTexture;
-	glGenTextures(1, &bufferTexture);
-	glBindTexture(GL_TEXTURE_2D, bufferTexture);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, cubeMapWidth, cubeMapHeight, 0, GL_RGB, GL_FLOAT, 0);
-
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	/*glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);*/
-	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, bufferTexture, 0);
-
-	// Set the list of draw buffers.
-	GLenum DrawBuffers[1] = { GL_COLOR_ATTACHMENT0 };
-	glDrawBuffers(1, DrawBuffers);
-
-	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-		return false;
+	
 
 	//Now that we have our own Buffer for the Cubemap rendering we can create the needed geometry
 	//-------------------------------------------------------------------------
-
 	float squareCoordinates[] = {
 		//vertex coordinates   //normals
-		1.0f,  1.0f, 0.0f,  1.0f,  1.0f, 0.0f,
-		 1.0f, -1.0f, 0.0f, 1.0f,  1.0f, 0.0f,
-		-1.0f, -1.0f, 0.0f, 1.0f,  1.0f, 0.0f,
-		-1.0f,  1.0f, 0.0f, 1.0f,  1.0f, 0.0f,
+		1.0f,  1.0f, 0.0f,    1.0f, 0.0f, 0.0f,
+		 1.0f, -1.0f, 0.0f,   1.0f, 0.0f, 0.0f,
+		-1.0f, -1.0f, 0.0f,    1.0f, 0.0f, 0.0f,
+		-1.0f,  1.0f, 0.0f,    1.0f, 0.0f, 0.0f
 	};
-
-	//cubemap faces
-	float sideNormals[] = {
-		0.5f,  0.5f, 0.0f,
-		0.5f,  -0.5f, 0.0f,
-		0.5f,  0.5f, -1.0f,
-		0.5f,  -0.5f, -1.0f,
-		
-		0.5f,  0.5f, -1.0f,
-		0.5f,  -0.5f, -1.0f,
-		0.5f,  0.5f, 0.0f,
-		0.5f,  -0.5f, 0.0f,
-
-		0.5f,  0.5f, 0.0f,
-		0.5f,  -0.5f, -1.0f,
-		0.5f,  0.5f, 0.0f,
-		0.5f,  -0.5f, -1.0f,
-
-		0.5f,  0.5f, 0.0f,
-		0.5f,  -0.5f, -1.0f,
-		0.5f,  0.5f, 0.0f,
-		0.5f,  -0.5f, -1.0f,
-
-		0.5f,  0.5f, 0.0f,
-		0.5f,  -0.5f, 0.0f,
-		0.5f,  0.5f, 0.0f,
-		0.5f,  -0.5f, 0.0f,
-
-		0.5f,  0.5f, -1.0f,
-		0.5f,  -0.5f, -1.0f,
-		0.5f,  0.5f, -1.0f,
-		0.5f,  -0.5f, -1.0f,
-	};
-
-	float left[] = {
-		0.5f,  0.5f, -1.0f,
-		0.5f,  -0.5f, -1.0f,
-		0.5f,  0.5f, 0.0f,
-		0.5f,  -0.5f, 0.0f,
-	};
-
-	float top[] = {
-		0.5f,  0.5f, 0.0f,
-		0.5f,  -0.5f, -1.0f,
-		0.5f,  0.5f, 0.0f,
-		0.5f,  -0.5f, -1.0f,
-	};
-
-	float bottom[] = {
-		0.5f,  0.5f, 0.0f,
-		0.5f,  -0.5f, -1.0f,
-		0.5f,  0.5f, 0.0f,
-		0.5f,  -0.5f, -1.0f,
-	};
-
-	float back[] = {
-		0.5f,  0.5f, 0.0f,
-		0.5f,  -0.5f, 0.0f,
-		0.5f,  0.5f, 0.0f,
-		0.5f,  -0.5f, 0.0f,
-	};
-
-	float front[] = {
-		0.5f,  0.5f, -1.0f,
-		0.5f,  -0.5f, -1.0f,
-		0.5f,  0.5f, -1.0f,
-		0.5f,  -0.5f, -1.0f,
-	};
-
 	
 	//indices for drawing the square
 	unsigned int squareIndices[] = {
@@ -217,146 +124,22 @@ int main()
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, squareIndexBuffer);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(squareIndices), squareIndices, GL_STATIC_DRAW);
 
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
-	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
 	glEnableVertexAttribArray(1);
-
-	//offscreen renderpass
-	//-------------------------------------------------------------------------
-
-	int mipResolutions[9] = {512};
-	for(int i = 1; i < 9; ++i)
-	{
-		mipResolutions[i] = mipResolutions[i-1] * 0.5;
-	}
-	
-	cubeMapShader.use();
-	glDisable(GL_DEPTH_TEST);
-
-	glBindFramebuffer(GL_FRAMEBUFFER, cubeMapBuffer);
-	
-	//generate the main Cubemap beforehand
-	unsigned int cubeMapTexture;
-	glGenTextures(1, &cubeMapTexture);
-
-	glUniform2fv(glGetUniformLocation(ourShader.ID, "invAtan"), 1, value_ptr(invAtan));
-
-	char const* c[] = { "file1.bmp", "file2.bmp", "file3.bmp", "file4.bmp", "file5.bmp", "file6.bmp" };
-	for (int i = 0; i < 6; ++i)
-	{
-
-		//loop to change the normals for each face
-	   //-------------------------------------------------------------------------
-	   
-		for (int n = 0; n < 4; ++n)
-		{
-			short offset = n * 6 + 3;
-			short normalOffset = i * 12 + n*3;
-			
-			squareCoordinates[offset++] = sideNormals[normalOffset++];
-			squareCoordinates[offset++] = sideNormals[normalOffset++];
-			squareCoordinates[offset] = sideNormals[normalOffset];
-			
-		}
-
-		glBindVertexArray(squareVAO);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(squareCoordinates), squareCoordinates, GL_STATIC_DRAW);
-		
-		//loop to create the MIP levels manually
-		//9 since the base texture is 512 pixel (2^9)
-		//-------------------------------------------------------------------------
-		for(int mipLevel = 0; mipLevel < 9; ++mipLevel)
-		{
-			int tempCubeMapWidth = mipResolutions[mipLevel];
-			int tempCubeMapHeight = mipResolutions[mipLevel];
-			
-			glViewport(0, 0, tempCubeMapWidth, tempCubeMapHeight);
-			
-			glClearColor(0.0f, 1.0f, 0.0f, 1.0f);
-
-
-			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-			glBindTexture(GL_TEXTURE_2D, envMap);
-
-			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
-			//bind the cubemap after the offscreen rendering pass
-			glBindTexture(GL_TEXTURE_CUBE_MAP, cubeMapTexture);
-			glReadBuffer(GL_COLOR_ATTACHMENT0);
-			
-			//compute texture dimensions and read it into the buffer
-			float* texBuffer = new float[tempCubeMapWidth * tempCubeMapHeight * 3];
-			
-			glReadPixels(0, 0, tempCubeMapWidth, tempCubeMapHeight, GL_RGB, GL_FLOAT, texBuffer);
-
-			
-			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
-				mipLevel,
-				GL_RGB32F,
-				tempCubeMapWidth, tempCubeMapHeight, 0,
-				GL_RGB, GL_FLOAT, texBuffer);
-
-			//set different parameters for filtering etc
-			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			
-		}
-		
-		
-		
-		/*float* texBuffer = new float[cubeMapWidth * cubeMapHeight * 3];
-		glReadPixels(0, 0, cubeMapWidth, cubeMapHeight, GL_RGB, GL_FLOAT, texBuffer);
-		glTexImage2D(GL_TEXTURE_2D, 0,
-			GL_RGB32F, cubeMapWidth, cubeMapHeight, 0, GL_RGB, GL_FLOAT, texBuffer);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);*/
-	}
-	
-	
-	//Bind our main framebuffer again to actually prepare the final scene
-	//-------------------------------------------------------------------------
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	
-	//get our relevant coordinates and begin filling up the buffers for the sphere model
-	std::vector<unsigned int> indices;
-	std::vector<float> vertices;
-	createSphereCoordinates(1.0, 144, 72, indices, vertices);
-
-	
-	unsigned int buffer, VAO, EBO;
-	glGenVertexArrays(1, &VAO);
-	glGenBuffers(1, &buffer);
-	glGenBuffers(1, &EBO);
-
-	// bind the Vertex Array Object first, then bind and set vertex buffer(s), and then configure vertex attributes(s).
-	glBindVertexArray(VAO);
-
-	glBindBuffer(GL_ARRAY_BUFFER, buffer);
-	glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
-	
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
-	
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), static_cast<void*>(nullptr));
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(0);
-	glEnableVertexAttribArray(1);
-	glEnableVertexAttribArray(2);
-
+	
+	
 	//Viewport reset
 	glViewport(0, 0, screenWidth, screenHeight);
 	glEnable(GL_DEPTH_TEST);
 
-	glBindTexture(GL_TEXTURE_2D, 0);
-	
+
+
 	while (!glfwWindowShouldClose(window))
 	{
 		processInput(window);
-		glClearColor(0.2f, 0.3f, 0.6f, 1.0f);
+		glClearColor(0.2f, 0.3f, 1.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		ourShader.use();
@@ -367,26 +150,17 @@ int main()
 				screenHeight), 0.1f, 100.0f));
 		ourShader.setMat4("viewMatrix", glm::mat4(1.0f));
 
-
-		//glBindTexture(GL_TEXTURE_CUBE_MAP, cubeMapTexture);
+		glBindVertexArray(squareVAO);
 		glBindTexture(GL_TEXTURE_2D, envMap);
-		glBindVertexArray(VAO);
-		
-		glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, nullptr);
+		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
-
-		glBindTexture(GL_TEXTURE_2D, envMap);
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}
 
-	glDeleteVertexArrays(1, &VAO);
-	glDeleteVertexArrays(1, &squareVAO);
-	glDeleteBuffers(1, &buffer);
-	glDeleteBuffers(1, &EBO);
 	glDeleteBuffers(1, &squareBuffer);
 	glDeleteBuffers(1, &squareIndexBuffer);
-	
+
 	glfwTerminate();
 	return 0;
 }
@@ -445,10 +219,10 @@ void processInput(GLFWwindow* window)
  *	stacks: number of pieces along the y-axis
  *	EBO: the EBO in which the indices should be written into to draw the sphere later
  *	buffer: the VAO into which the coordinates should be written
- *	
+ *
  *	Writes the indices into the specified EBO and the coordinates, normals as well as texture coordinates into the buffer
  */
-void createSphereCoordinates(float radius, float sectors, float stacks, std::vector<unsigned int> &EBO, std::vector<float>& buffer)
+void createSphereCoordinates(float radius, float sectors, float stacks, std::vector<unsigned int>& EBO, std::vector<float>& buffer)
 {
 	std::vector<float> texCoords;
 
@@ -520,13 +294,13 @@ void createSphereCoordinates(float radius, float sectors, float stacks, std::vec
 			{
 				EBO.push_back(s1);
 				EBO.push_back(s2);
-				EBO.push_back(s1+1);
+				EBO.push_back(s1 + 1);
 			}
 
 			//we need 1 vertices from first sector and 2 from next sector
 			if (i != (stacks - 1))
 			{
-				EBO.push_back(s1+1);
+				EBO.push_back(s1 + 1);
 				EBO.push_back(s2);
 				EBO.push_back(s2 + 1);
 			}

@@ -5,6 +5,7 @@ layout(location = 2) in vec2 texCoords;
 
 out vec3 normal;
 out vec2 coords;
+out vec3 cubeMapCoords;
 
 uniform mat4 transMat;
 uniform mat4 projMatrix;
@@ -14,8 +15,10 @@ uniform mat4 modelMatrix;
 
 void main()
 {
-	gl_Position =  projMatrix * viewMatrix * transMat * vec4(aPos, 1);
 	normal = aNormal;
+	cubeMapCoords = aPos;
+	gl_Position =  projMatrix * viewMatrix * transMat * vec4(aPos, 1);
+	
 	coords = texCoords;
 	
 }

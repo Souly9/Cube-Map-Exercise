@@ -27,12 +27,12 @@
     <ClInclude Include="stb_image.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\..\..\download\stb-master\stb_image_write.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Cube Map Exercise.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="glad.c">
@@ -41,21 +41,21 @@
     <ClCompile Include="stb_image stuff.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Cube Map Exercise.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="vert.vs">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="frag.fs">
-      <Filter>Shaders</Filter>
-    </None>
     <None Include="envFrag.fs">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="cubeMapFrag.fs">
+    <None Include="cubeMapVert.vs">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="cubeMapVert.vs">
+    <None Include="cubeMapFrag.frag">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>

@@ -1,7 +1,8 @@
 ﻿  Cube Map Exercise.cpp
-d:\programme\fh\rendering\cubemap\cube map exercise\cube map exercise\cube map exercise.cpp(305): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
-d:\programme\fh\rendering\cubemap\cube map exercise\cube map exercise\cube map exercise.cpp(311): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
-d:\programme\fh\rendering\cubemap\cube map exercise\cube map exercise\cube map exercise.cpp(338): warning C4244: '=': conversion from 'float' to 'int', possible loss of data
-d:\programme\fh\rendering\cubemap\cube map exercise\cube map exercise\cube map exercise.cpp(339): warning C4244: '=': conversion from 'float' to 'int', possible loss of data
-d:\programme\fh\rendering\cubemap\cube map exercise\cube map exercise\cube map exercise.cpp(300): warning C4101: 'sinStack': unreferenced local variable
+D:\Programme\FH\Rendering\CubeMap\Cube Map Exercise\Cube Map Exercise\Cube Map Exercise.cpp(231,43): warning C4244: '=': 'double' から 'int' への変換です。データが失われる可能性があります。
+D:\Programme\FH\Rendering\CubeMap\Cube Map Exercise\Cube Map Exercise\Cube Map Exercise.cpp(475,25): warning C4244: '=': 'double' から 'float' への変換です。データが失われる可能性があります。
+D:\Programme\FH\Rendering\CubeMap\Cube Map Exercise\Cube Map Exercise\Cube Map Exercise.cpp(481,25): warning C4244: '=': 'double' から 'float' への変換です。データが失われる可能性があります。
+D:\Programme\FH\Rendering\CubeMap\Cube Map Exercise\Cube Map Exercise\Cube Map Exercise.cpp(508,10): warning C4244: '=': 'float' から 'int' への変換です。データが失われる可能性があります。
+D:\Programme\FH\Rendering\CubeMap\Cube Map Exercise\Cube Map Exercise\Cube Map Exercise.cpp(509,21): warning C4244: '=': 'float' から 'int' への変換です。データが失われる可能性があります。
+D:\Programme\FH\Rendering\CubeMap\Cube Map Exercise\Cube Map Exercise\Cube Map Exercise.cpp(470,18): warning C4101: 'sinStack': ローカル変数は 1 度も使われていません。
   Cube Map Exercise.vcxproj -> D:\Programme\FH\Rendering\CubeMap\Cube Map Exercise\Debug\Cube Map Exercise.exe
