@@ -16,12 +16,16 @@
 //which are computed in the Fragment Shader 
 //x-coord: 2*PI approximation
 //y-coord: PI approximation
-#define invAtan glm::vec2(0.1591, 0.3183)
+#define numOfPoints 4096
 #define PI 3.14159265358979323846
 #define screenWidth 800
 #define screenHeight 600
 #define cubeMapWidth 512
 #define cubeMapHeight 512
+
+//variables to control the texture
+float roughness = 0.0f;
+float exposure = 1.0;
 
 //lighting variables
 glm::vec3 lightPos(0.0f, 0.0f, 1.0f);
@@ -39,7 +43,6 @@ void processInput(GLFWwindow* window);
 
 //method to create Sphere Coordinates to draw the Sphere! Check definition for more details
 void createSphereCoordinates(float radius, float sectors, float stacks, std::vector<unsigned int> &EBO, std::vector<float>& buffer);
-
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
@@ -76,7 +79,7 @@ int main()
 	int width, height, nrChannels;
 	stbi_set_flip_vertically_on_load(true);
 
-	float* data = stbi_loadf("champagne_castle_1_1k.hdr",
+	float* data = stbi_loadf("cedar_bridge_1k1.hdr",
 		&width, &height, &nrChannels, 0);
 
 	if (!data)
@@ -99,7 +102,7 @@ int main()
 	unsigned int cubeMapBuffer;
 	glGenFramebuffers(1, &cubeMapBuffer);
 	glBindFramebuffer(GL_FRAMEBUFFER, cubeMapBuffer);
-
+	
 	unsigned int bufferTexture;
 	glGenTextures(1, &bufferTexture);
 	glBindTexture(GL_TEXTURE_2D, bufferTexture);
@@ -123,81 +126,52 @@ int main()
 
 	float squareCoordinates[] = {
 		//vertex coordinates   //normals
-		1.0f,  1.0f, 0.0f,  1.0f,  1.0f, 0.0f,
-		 1.0f, -1.0f, 0.0f, 1.0f,  1.0f, 0.0f,
-		-1.0f, -1.0f, 0.0f, 1.0f,  1.0f, 0.0f,
-		-1.0f,  1.0f, 0.0f, 1.0f,  1.0f, 0.0f,
+		1.0f,  1.0f, 0.0f,     1.0f,  1.0f, 0.0f,
+		 1.0f, -1.0f, 0.0f,    1.0f,  1.0f, 0.0f,
+		-1.0f, -1.0f, 0.0f,    1.0f,  1.0f, 0.0f,
+		-1.0f,  1.0f, 0.0f,    1.0f,  1.0f, 0.0f,
 	};
 
-	//cubemap faces
-	float sideNormals[] = {
-		0.5f,  0.5f, 0.0f,
-		0.5f,  -0.5f, 0.0f,
-		0.5f,  0.5f, -1.0f,
-		0.5f,  -0.5f, -1.0f,
+	//cubemap coordinates for the front and back points in 3d space
+	/*orientation analog for front and back, numbers are the indices:
+	 * 3---0
+	 * |   |
+	 * |   |
+	 * 2---1
+	 */
+	float cubeNormals[] = {
+		//front
+		1.0f,  1.0f, 1.0f,
+		1.0f,  -1.0f, 1.0f,
+		-1.0f,  -1.0f, 1.0f,
+		-1.0f,  1.0f, 1.0f,
+
+		//back
+		1.0f,  1.0f, -1.0f,
+		1.0f,  -1.0f, -1.0f,
+		-1.0f, -1.0f, -1.0f,
+		-1.0f,  1.0f, -1.0f,
+	};
+
+	//indices to assign the normals to the appropriate faces with
+	short cubeIndices[]
+	{
+		//right
+		5, 4, 0, 1,
+		//left
+		2, 3, 7, 6,
 		
-		0.5f,  0.5f, -1.0f,
-		0.5f,  -0.5f, -1.0f,
-		0.5f,  0.5f, 0.0f,
-		0.5f,  -0.5f, 0.0f,
+		//top
+		0, 4, 7, 3,
+		//bottom
+		5, 1, 2, 6,
 
-		0.5f,  0.5f, 0.0f,
-		0.5f,  -0.5f, -1.0f,
-		0.5f,  0.5f, 0.0f,
-		0.5f,  -0.5f, -1.0f,
-
-		0.5f,  0.5f, 0.0f,
-		0.5f,  -0.5f, -1.0f,
-		0.5f,  0.5f, 0.0f,
-		0.5f,  -0.5f, -1.0f,
-
-		0.5f,  0.5f, 0.0f,
-		0.5f,  -0.5f, 0.0f,
-		0.5f,  0.5f, 0.0f,
-		0.5f,  -0.5f, 0.0f,
-
-		0.5f,  0.5f, -1.0f,
-		0.5f,  -0.5f, -1.0f,
-		0.5f,  0.5f, -1.0f,
-		0.5f,  -0.5f, -1.0f,
+		//back
+		1, 0, 3, 2,
+		//front
+		6, 7, 4, 5
 	};
 
-	float left[] = {
-		0.5f,  0.5f, -1.0f,
-		0.5f,  -0.5f, -1.0f,
-		0.5f,  0.5f, 0.0f,
-		0.5f,  -0.5f, 0.0f,
-	};
-
-	float top[] = {
-		0.5f,  0.5f, 0.0f,
-		0.5f,  -0.5f, -1.0f,
-		0.5f,  0.5f, 0.0f,
-		0.5f,  -0.5f, -1.0f,
-	};
-
-	float bottom[] = {
-		0.5f,  0.5f, 0.0f,
-		0.5f,  -0.5f, -1.0f,
-		0.5f,  0.5f, 0.0f,
-		0.5f,  -0.5f, -1.0f,
-	};
-
-	float back[] = {
-		0.5f,  0.5f, 0.0f,
-		0.5f,  -0.5f, 0.0f,
-		0.5f,  0.5f, 0.0f,
-		0.5f,  -0.5f, 0.0f,
-	};
-
-	float front[] = {
-		0.5f,  0.5f, -1.0f,
-		0.5f,  -0.5f, -1.0f,
-		0.5f,  0.5f, -1.0f,
-		0.5f,  -0.5f, -1.0f,
-	};
-
-	
 	//indices for drawing the square
 	unsigned int squareIndices[] = {
 		 0, 1, 3,  // first Triangle
@@ -224,7 +198,6 @@ int main()
 
 	//offscreen renderpass
 	//-------------------------------------------------------------------------
-
 	int mipResolutions[9] = {512};
 	for(int i = 1; i < 9; ++i)
 	{
@@ -239,27 +212,33 @@ int main()
 	//generate the main Cubemap beforehand
 	unsigned int cubeMapTexture;
 	glGenTextures(1, &cubeMapTexture);
-
-	glUniform2fv(glGetUniformLocation(ourShader.ID, "invAtan"), 1, value_ptr(invAtan));
-
-	char const* c[] = { "file1.bmp", "file2.bmp", "file3.bmp", "file4.bmp", "file5.bmp", "file6.bmp" };
+	
+	glUniform1f(glGetUniformLocation(cubeMapShader.ID, "numOfPoints"), numOfPoints);
+	glUniform1f(glGetUniformLocation(cubeMapShader.ID, "PI"), PI);
+	
 	for (int i = 0; i < 6; ++i)
 	{
-
 		//loop to change the normals for each face
 	   //-------------------------------------------------------------------------
-	   
 		for (int n = 0; n < 4; ++n)
 		{
+			//offset to iterate over the second batch of coordinates in our vertex buffer
+			//every line is 6 indeces big and 3 of them are the screen Coordinates
 			short offset = n * 6 + 3;
-			short normalOffset = i * 12 + n*3;
-			
-			squareCoordinates[offset++] = sideNormals[normalOffset++];
-			squareCoordinates[offset++] = sideNormals[normalOffset++];
-			squareCoordinates[offset] = sideNormals[normalOffset];
+
+			//compute the index of the next coordinate as cubeIndices holds all indices for all Cubemap faces
+			//every line of indices in cubeIndices is sorted by face index,
+			//the index of n-th point of the i-th face (multiplied by 4 since 4 indeces are in every row and have to be jumped over
+			//This index is then mulitplied by 3 to jump over each pair of 3 coordinates in the actual cubeNormals array for index-times
+			short pos = cubeIndices[n + (4 * i)] * 3;
+
+			//since both offset and pos now point to the first coordinate of a coordinate triplet we can simply iterate over it
+			squareCoordinates[offset++] = cubeNormals[pos++];
+			squareCoordinates[offset++] = cubeNormals[pos++];
+			squareCoordinates[offset] = cubeNormals[pos];
 			
 		}
-
+		
 		glBindVertexArray(squareVAO);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(squareCoordinates), squareCoordinates, GL_STATIC_DRAW);
 		
@@ -273,13 +252,16 @@ int main()
 			
 			glViewport(0, 0, tempCubeMapWidth, tempCubeMapHeight);
 			
-			glClearColor(0.0f, 1.0f, 0.0f, 1.0f);
-
-
-			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 			glBindTexture(GL_TEXTURE_2D, envMap);
 
+			//compute the specular exponent, the higher the mip level the lower the value should be
+			float exponent = 1.0f - (mipLevel / 8.0f);
+			float specular = pow(2, 15 * exponent);
+			
+			glUniform1f(glGetUniformLocation(ourShader.ID, "specular"), specular);
+			
 			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
+			
 			//bind the cubemap after the offscreen rendering pass
 			glBindTexture(GL_TEXTURE_CUBE_MAP, cubeMapTexture);
 			glReadBuffer(GL_COLOR_ATTACHMENT0);
@@ -289,32 +271,22 @@ int main()
 			
 			glReadPixels(0, 0, tempCubeMapWidth, tempCubeMapHeight, GL_RGB, GL_FLOAT, texBuffer);
 
-			
 			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
 				mipLevel,
 				GL_RGB32F,
 				tempCubeMapWidth, tempCubeMapHeight, 0,
 				GL_RGB, GL_FLOAT, texBuffer);
-
-			//set different parameters for filtering etc
-			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			
 		}
-		
-		
-		
-		/*float* texBuffer = new float[cubeMapWidth * cubeMapHeight * 3];
-		glReadPixels(0, 0, cubeMapWidth, cubeMapHeight, GL_RGB, GL_FLOAT, texBuffer);
-		glTexImage2D(GL_TEXTURE_2D, 0,
-			GL_RGB32F, cubeMapWidth, cubeMapHeight, 0, GL_RGB, GL_FLOAT, texBuffer);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);*/
 	}
 	
+	//set different parameters for filtering
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAX_LEVEL, 8);
+
 	
 	//Bind our main framebuffer again to actually prepare the final scene
 	//-------------------------------------------------------------------------
@@ -339,8 +311,10 @@ int main()
 	
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
-	
+
+	//coordinates
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), static_cast<void*>(nullptr));
+	//normals
 	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
 	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
 	glEnableVertexAttribArray(0);
@@ -367,9 +341,11 @@ int main()
 				screenHeight), 0.1f, 100.0f));
 		ourShader.setMat4("viewMatrix", glm::mat4(1.0f));
 
-
-		//glBindTexture(GL_TEXTURE_CUBE_MAP, cubeMapTexture);
-		glBindTexture(GL_TEXTURE_2D, envMap);
+		glUniform1f(glGetUniformLocation(ourShader.ID, "roughness"), roughness);
+		glUniform1i(glGetUniformLocation(ourShader.ID, "mipLevels"), 8);
+		glUniform1f(glGetUniformLocation(ourShader.ID, "exposure"), exposure);
+		
+		glBindTexture(GL_TEXTURE_CUBE_MAP, cubeMapTexture);
 		glBindVertexArray(VAO);
 		
 		glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, nullptr);
@@ -399,7 +375,20 @@ void processInput(GLFWwindow* window)
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS)
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-
+	
+	if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS) 
+	{
+		if(roughness < 0.99)
+			roughness += 0.01f;
+		std::cout << "Roughness: " << roughness << "   " << "Exposure: " << exposure << std::endl;
+	}
+	if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
+	{
+		
+		exposure += 0.01f;
+		std::cout << "Roughness: " << roughness << "   " << "Exposure: " << exposure << std::endl;
+	}
+	
 	if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
 	{
 		if (left)

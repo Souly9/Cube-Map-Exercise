@@ -1,4 +1,4 @@
-#version 330 core
+#version 400 core
 out vec4 FragColor;
 
 in vec3 normal;
@@ -6,20 +6,17 @@ in vec2 coords;
 in vec3 cubeMapCoords;
 
 uniform samplerCube cubeMap;
-uniform sampler2D textu;
-uniform vec2 invAtan;
+
+uniform float roughness;
+uniform int mipLevels;
+uniform float exposure;
 
 void main()
 {	
-
-	vec3 norm = normalize(normal);
-
-	//typical transformation into sphere UV coordinates
-	vec2 uv = vec2(atan(norm.z, norm.x), asin(norm.y));
-    uv *= invAtan;
-    uv += 0.5; 
-	
+	float offset = roughness * float(mipLevels);
 	//vec3 color = texture(cubeMap, normal).rgb;
-	vec3 color = texture(textu, coords).rgb;
-	FragColor = vec4(color, 1.0);
+	vec4 color = textureLod(cubeMap, normal, offset);
+	//vec3 color = texture(textu, uv).rgb;
+	//FragColor = vec4(color, 1.0);
+	FragColor = color * exposure;
 } 
