@@ -16,16 +16,18 @@
 //which are computed in the Fragment Shader 
 //x-coord: 2*PI approximation
 //y-coord: PI approximation
-#define numOfPoints 4096
+#define numOfPoints 2048
 #define PI 3.14159265358979323846
 #define screenWidth 800
 #define screenHeight 600
 #define cubeMapWidth 512
 #define cubeMapHeight 512
 
+float mipmaps = 8.0f;
+
 //variables to control the texture
-float roughness = 0.0f;
-float exposure = 1.0;
+double roughness = 0.0f;
+double exposure = 1.0;
 
 //lighting variables
 glm::vec3 lightPos(0.0f, 0.0f, 1.0f);
@@ -33,14 +35,16 @@ glm::vec3 lightColor(1.0f, 1.0f, 1.0f);
 
 //later used to manipulate rotation from processInput method for rendering, hence the global variable
 glm::mat4 transMatrix = translate(glm::mat4(1.0f), glm::vec3(0, 0, -2.0));
-
-//helper variables to control rotation with arrow keys
-bool left = false, up = false;
-float rotateX = 0, rotateY = 0;
-
+glm::mat4 inverseTrans = glm::mat4();
+glm::mat4 Model = rotate(transMatrix, 0.0f, glm::vec3(0, 1.0f, 0));
+//helper variables to control rotation by mouse
+float lastX, lastY;
+bool unSet = true;
+bool mouseButtonPressed = false;
 
 void processInput(GLFWwindow* window);
-
+void mouse_callback(GLFWwindow* window, int button, int action, int mods);
+void mouse_move_callback(GLFWwindow* window, double xpos, double ypos);
 //method to create Sphere Coordinates to draw the Sphere! Check definition for more details
 void createSphereCoordinates(float radius, float sectors, float stacks, std::vector<unsigned int> &EBO, std::vector<float>& buffer);
 
@@ -53,10 +57,10 @@ int main()
 {
 	glfwInit();
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 4);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-	GLFWwindow* window = glfwCreateWindow(800, 600, "CubeMap", nullptr, nullptr);
+	GLFWwindow* window = glfwCreateWindow(screenWidth, screenHeight, "CubeMap", nullptr, nullptr);
 
 	glfwMakeContextCurrent(window);
 
@@ -68,13 +72,15 @@ int main()
 
 	glViewport(0, 0, screenWidth, screenHeight);
 
-	//Tell OpenGL we want to call our previously define resize function on resize
+	//Set callback functions
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-
-	Shader ourShader("vert.vs", "envFrag.fs");
+	glfwSetMouseButtonCallback(window, mouse_callback);
+	glfwSetCursorPosCallback(window, mouse_move_callback);
+	//initialize the Shaders for the Offscreen-Renderpass and final image
 	Shader cubeMapShader("cubeMapVert.vs", "cubeMapFrag.frag");
-
-	//create/read the environment map
+	Shader ourShader("vert.vs", "envFrag.fs");
+	
+	//create and read the environment map texture
 	//-------------------------------------------------------------------------
 	int width, height, nrChannels;
 	stbi_set_flip_vertically_on_load(true);
@@ -110,20 +116,19 @@ int main()
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	/*glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);*/
 	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, bufferTexture, 0);
 
-	// Set the list of draw buffers.
+	// Set the draw buffers, only one per pass is needed in this case since we only want to render one cubemap face
 	GLenum DrawBuffers[1] = { GL_COLOR_ATTACHMENT0 };
 	glDrawBuffers(1, DrawBuffers);
 
 	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 		return false;
 
-	//Now that we have our own Buffer for the Cubemap rendering we can create the needed geometry
+	//Now that we have our Buffer for the Cubemap rendering we can create the needed geometry
 	//-------------------------------------------------------------------------
 
+	//square that covers the whole screen for the cubemap face generation
 	float squareCoordinates[] = {
 		//vertex coordinates   //normals
 		1.0f,  1.0f, 0.0f,     1.0f,  1.0f, 0.0f,
@@ -150,10 +155,10 @@ int main()
 		1.0f,  1.0f, -1.0f,
 		1.0f,  -1.0f, -1.0f,
 		-1.0f, -1.0f, -1.0f,
-		-1.0f,  1.0f, -1.0f,
+		-1.0f,  1.0f, -1.0f
 	};
 
-	//indices to assign the normals to the appropriate faces with
+	//indices to assign the normals to the appropriate faces 
 	short cubeIndices[]
 	{
 		//right
@@ -174,8 +179,8 @@ int main()
 
 	//indices for drawing the square
 	unsigned int squareIndices[] = {
-		 0, 1, 3,  // first Triangle
-		1, 2, 3
+		 0, 1, 3,  
+		 1, 2, 3
 	};
 
 	//usual buffer creation and binding
@@ -198,18 +203,23 @@ int main()
 
 	//offscreen renderpass
 	//-------------------------------------------------------------------------
-	int mipResolutions[9] = {512};
-	for(int i = 1; i < 9; ++i)
+
+	//create mipmap resolution array
+	std::vector<int> mipResolutions;
+	mipResolutions.push_back(cubeMapHeight);
+	for(int i = 1; i < mipmaps + 1; ++i)
 	{
-		mipResolutions[i] = mipResolutions[i-1] * 0.5;
+		mipResolutions.push_back(mipResolutions[i-1] * 0.5);
 	}
 	
 	cubeMapShader.use();
+
+	//no depth test needed since the square covers the entire screen
 	glDisable(GL_DEPTH_TEST);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, cubeMapBuffer);
 	
-	//generate the main Cubemap beforehand
+	//generate the main Cubemap
 	unsigned int cubeMapTexture;
 	glGenTextures(1, &cubeMapTexture);
 	
@@ -249,13 +259,14 @@ int main()
 		{
 			int tempCubeMapWidth = mipResolutions[mipLevel];
 			int tempCubeMapHeight = mipResolutions[mipLevel];
-			
+
+			//resize the viewport to fit the mipmap resolution
 			glViewport(0, 0, tempCubeMapWidth, tempCubeMapHeight);
 			
 			glBindTexture(GL_TEXTURE_2D, envMap);
 
 			//compute the specular exponent, the higher the mip level the lower the value should be
-			float exponent = 1.0f - (mipLevel / 8.0f);
+			float exponent = 1.0f - (mipLevel / mipmaps);
 			float specular = pow(2, 15 * exponent);
 			
 			glUniform1f(glGetUniformLocation(ourShader.ID, "specular"), specular);
@@ -284,11 +295,11 @@ int main()
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAX_LEVEL, 8);
-
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAX_LEVEL, mipmaps);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_SEAMLESS, 1);
 	
-	//Bind our main framebuffer again to actually prepare the final scene
+	//Bind our main framebuffer to actually prepare the final scene
 	//-------------------------------------------------------------------------
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	
@@ -313,20 +324,20 @@ int main()
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
 
 	//coordinates
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), static_cast<void*>(nullptr));
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), static_cast<void*>(nullptr));
 	//normals
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
 	glEnableVertexAttribArray(0);
 	glEnableVertexAttribArray(1);
-	glEnableVertexAttribArray(2);
+	
 
 	//Viewport reset
 	glViewport(0, 0, screenWidth, screenHeight);
 	glEnable(GL_DEPTH_TEST);
 
 	glBindTexture(GL_TEXTURE_2D, 0);
-	
+
+	//main render loop
 	while (!glfwWindowShouldClose(window))
 	{
 		processInput(window);
@@ -335,14 +346,14 @@ int main()
 
 		ourShader.use();
 
-		ourShader.setMat4("transMat", transMatrix);
+		ourShader.setMat4("transMat", Model);
 		ourShader.setMat4("projMatrix", glm::perspective(glm::radians(90.0f),
 			static_cast<float>(screenWidth) / static_cast<float>(
 				screenHeight), 0.1f, 100.0f));
 		ourShader.setMat4("viewMatrix", glm::mat4(1.0f));
 
 		glUniform1f(glGetUniformLocation(ourShader.ID, "roughness"), roughness);
-		glUniform1i(glGetUniformLocation(ourShader.ID, "mipLevels"), 8);
+		glUniform1i(glGetUniformLocation(ourShader.ID, "mipLevels"), mipmaps);
 		glUniform1f(glGetUniformLocation(ourShader.ID, "exposure"), exposure);
 		
 		glBindTexture(GL_TEXTURE_CUBE_MAP, cubeMapTexture);
@@ -350,8 +361,6 @@ int main()
 		
 		glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, nullptr);
 
-
-		glBindTexture(GL_TEXTURE_2D, envMap);
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}
@@ -367,6 +376,7 @@ int main()
 	return 0;
 }
 
+//process input to increase roughness and exposure as well as switch between PolygonModes
 void processInput(GLFWwindow* window)
 {
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
@@ -375,55 +385,53 @@ void processInput(GLFWwindow* window)
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS)
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-	
 	if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS) 
 	{
-		if(roughness < 0.99)
+		if(roughness < 0.9999)
 			roughness += 0.01f;
 		std::cout << "Roughness: " << roughness << "   " << "Exposure: " << exposure << std::endl;
 	}
 	if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
 	{
-		
-		exposure += 0.01f;
+		if (exposure < 1.9999)
+			exposure += 0.001f;
 		std::cout << "Roughness: " << roughness << "   " << "Exposure: " << exposure << std::endl;
-	}
-	
-	if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
-	{
-		if (left)
-			rotateY = 0;
-		left = false;
-		rotateY += 0.01f;
-		transMatrix = glm::mat4(rotate(transMatrix, glm::radians(rotateY), glm::vec3(0, 1, 0)));
-	}
-	if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
-	{
-		if (up)
-			rotateX = 0;
-		up = false;
-		rotateX -= 0.01f;
-		transMatrix = glm::mat4(rotate(transMatrix, glm::radians(rotateX), glm::vec3(1, 0, 0)));
-	}
-	if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
-	{
-		if (!up)
-			rotateX = 0;
-		up = true;
-		rotateX += 0.01f;
-		transMatrix = glm::mat4(rotate(transMatrix, glm::radians(rotateX), glm::vec3(1, 0, 0)));
-	}
-
-	if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
-	{
-		if (!left)
-			rotateY = 0;
-		left = true;
-		rotateY -= 0.01f;
-		transMatrix = glm::mat4(rotate(transMatrix, glm::radians(rotateY), glm::vec3(0, 1, 0)));
 	}
 }
 
+void mouse_callback(GLFWwindow* window, int button, int action, int mods)
+{
+	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+		mouseButtonPressed = true;
+		return;
+	}
+	mouseButtonPressed = false;
+}
+
+void mouse_move_callback(GLFWwindow* window, double xpos, double ypos)
+{
+	if (mouseButtonPressed) {
+		if (unSet)
+		{
+			lastX = xpos;
+			lastY = ypos;
+			unSet = false;
+		}
+		float xOffset = xpos-lastX;
+		float yOffset = ypos-lastY;
+		lastX = xpos;
+		lastY = ypos;
+
+		const float sensitivity = 1.0f;
+		xOffset *= sensitivity;
+		yOffset *= sensitivity;
+		glm::vec3 yAxis = Model * glm::vec4(0, 1.0f, 1.0f, 1.0f);
+		
+		Model = rotate(Model, glm::radians(xOffset), glm::vec3(yAxis.x, yAxis.y, yAxis.z));
+		glm::vec3 xAxis = Model * glm::vec4(0,0,1.0f, 1.0f);
+		Model = rotate(Model, glm::radians(yOffset), glm::vec3(xAxis.x, xAxis.y, xAxis.z));
+	}
+}
 
 /*	Method takes the sphere radius as first input
  *	Calculation happens based on the sector and stacks principle where the Sphere is divided into tinier spaces
@@ -439,8 +447,6 @@ void processInput(GLFWwindow* window)
  */
 void createSphereCoordinates(float radius, float sectors, float stacks, std::vector<unsigned int> &EBO, std::vector<float>& buffer)
 {
-	std::vector<float> texCoords;
-
 	float x, y, z;
 
 	//helper variables for normal calculation
@@ -451,7 +457,6 @@ void createSphereCoordinates(float radius, float sectors, float stacks, std::vec
 	//declared for the normal calculation:
 	//multiplying a given coordinate by the length Inverse results 
 	float lengthInv = 1.0f / radius;
-
 
 	float sectorAngle, stackAngle;
 
@@ -481,11 +486,6 @@ void createSphereCoordinates(float radius, float sectors, float stacks, std::vec
 			buffer.push_back(nx);
 			buffer.push_back(ny);
 			buffer.push_back(nz);
-
-			s = static_cast<float>(j) / sectors;
-			t = static_cast<float>(i) / stacks;
-			buffer.push_back(s);
-			buffer.push_back(t);
 		}
 	}
 

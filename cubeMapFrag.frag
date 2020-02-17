@@ -8,55 +8,52 @@ uniform float specular;
 uniform float PI;
 uniform float numOfPoints;
 
+/*Fragment Shader takes in an environment Map in longitute latitude form and filters it based on the fragment position
+* Process is based on the concept of Importance Sampling with random Hammersley Points being generated to compute the light at the points around the fragment
+* Each miplevel is filtered to appear rougher based on the specular exponent and decreasing resolution
+*/
+
+
 //compute Hammersley Points in spherical coordinates
 vec2 computeHammersleyPoint(uint i) 
 {
+	//temporary Hammersley point 
 	vec2 H = vec2(float(i) / numOfPoints, bitfieldReverse(i) / float(pow(2, 32)));
 	
+	//the final vector in spherical coordinates
+	//specular exponent is considered due to the importance sampling
+	//divided into two steps to make it more readable
 	vec2 sphereC;
-
-	//H.y = H.x / (2*PI);
-	//H.x = acos(pow(H.y, 1.0/(specular+1)));
-	
 	sphereC.x = acos(pow(H.y, 1.0/(specular + 1)));
-	sphereC.y = H.x / (2*PI);
-	
-	sphereC = normalize(sphereC);
-	
+	sphereC.y = 2 * PI * H.x;
+
 	return sphereC;
 }
 
+//Transform a vector into the carthesian coordinate system
 vec3 computeKarthesian(vec2 hVector) {
-	vec3 karthesianVec;
 	
+	vec3 karthesianVec;
 	float sineTheta = sin(hVector.x);
 
 	karthesianVec.x = sineTheta * cos(hVector.y);
 	karthesianVec.y = sineTheta * sin(hVector.y);
 	karthesianVec.z = cos(hVector.x);
 
-	return normalize(karthesianVec);
+	return karthesianVec;
 }
 
-vec3 computePerpendicular(vec3 vector) {
-	return vec3(vector.y, -vector.x, vector.z);
-}
-
+//Main function to generate a sample vector through the Hammersley sequence
 vec3 randomSample(uint i, vec3 normal) {
 
 	vec3 randPoints;
 	vec3 sampleVec;
-
 	vec3 norm = normalize(normal);
-
-	vec3 up        = abs(norm.z) <1 ?  vec3(0.0, 1.0, 1.0) : vec3(1.0, 0.0, 0.0);
-	
-    vec3 tangent   = normalize(cross(up, norm)); // normalize(up);
+    vec3 tangent   = vec3(0); 
     vec3 bitangent = cross(norm, tangent);
 
 	randPoints.xy = computeHammersleyPoint(i);
 	randPoints = computeKarthesian(randPoints.xy);
-	randPoints = normalize(randPoints);
 	sampleVec = (randPoints.x * tangent) + (randPoints.y * bitangent) + (randPoints.z * norm);
 	
 	return sampleVec;
@@ -74,6 +71,7 @@ vec3 sampleEnvMap(vec3 vector) {
 	return texture(envMap, uv).rgb;
 }
 
+//Main function to sample the environment map through Importance Sampling and filter it accordint to miplevel
 vec3 filterMap(vec3 normal) {
 	float sum = 0.0;
 	vec3 result = vec3(0.0);
