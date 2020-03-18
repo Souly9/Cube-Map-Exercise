@@ -26,7 +26,7 @@ vec2 computeHammersleyPoint(uint i)
 	vec2 sphereC;
 	sphereC.x = acos(pow(H.y, 1.0/(specular + 1)));
 	sphereC.y = 2 * PI * H.x;
-
+	
 	return sphereC;
 }
 
