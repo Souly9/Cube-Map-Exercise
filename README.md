@@ -1,2 +1,1 @@
-# Cube-Map-Exercise
-Creates a cubemap from an environment map in OpenGL without any actual cubemap function
+Creates and filters a cubemap from an environment map in an offscreen renderpass. Programmed with OpenGL.
